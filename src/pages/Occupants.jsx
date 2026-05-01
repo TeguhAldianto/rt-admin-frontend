@@ -1,193 +1,147 @@
-import { useState, useEffect } from 'react';
-import api from '../services/api';
+import { useState, useEffect, useCallback } from 'react';
+import { getOccupants, createOccupant } from '../services/api';
 
-export default function Occupants() {
-    const [occupants, setOccupants] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [refreshTrigger, setRefreshTrigger] = useState(0); // Tambahkan state trigger
-    const [formData, setFormData] = useState({
-        full_name: '',
-        id_card_photo: null,
-        occupant_status: 'tetap',
-        phone_number: '',
-        marital_status: 'belum_menikah',
-    });
+const Occupants = () => {
+  const [occupants, setOccupants] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    nik: '',
+    phone: '',
+    is_permanent: true
+  });
 
-    // Fetching logic dimasukkan langsung ke dalam useEffect
-    useEffect(() => {
-        const fetchOccupants = async () => {
-            try {
-                const response = await api.get('/occupants');
-                setOccupants(response.data.data);
-            } catch (error) {
-                console.error('Error fetching occupants:', error);
-            }
-        };
+  // Membungkus fungsi fetch dengan useCallback untuk menjaga stabilitas referensi
+  const fetchOccupants = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getOccupants();
+      setOccupants(response.data.data);
+    } catch (error) {
+      console.error("Gagal memuat data warga:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-        fetchOccupants();
-    }, [refreshTrigger]); // Effect akan berjalan ulang jika refreshTrigger berubah
-
-    const handleInputChange = (e) => {
-        const { name, value, files } = e.target;
-        if (name === 'id_card_photo') {
-            setFormData({ ...formData, id_card_photo: files[0] });
-        } else {
-            setFormData({ ...formData, [name]: value });
-        }
+  // Menjalankan fetchOccupants saat komponen dimuat
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await fetchOccupants();
+      }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setLoading(true);
+    loadData();
 
-        const data = new FormData();
-        data.append('full_name', formData.full_name);
-        data.append('occupant_status', formData.occupant_status);
-        data.append('phone_number', formData.phone_number);
-        data.append('marital_status', formData.marital_status);
-
-        if (formData.id_card_photo) {
-            data.append('id_card_photo', formData.id_card_photo);
-        }
-
-        try {
-            await api.post('/occupants', data, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-
-            setFormData({
-                full_name: '',
-                id_card_photo: null,
-                occupant_status: 'tetap',
-                phone_number: '',
-                marital_status: 'belum_menikah',
-            });
-
-            // Update trigger untuk memancing useEffect berjalan ulang (refresh data)
-            setRefreshTrigger(prev => prev + 1);
-            alert('Penghuni berhasil ditambahkan!');
-        } catch (error) {
-            console.error('Error saving occupant:', error);
-            alert('Gagal menyimpan data.');
-        } finally {
-            setLoading(false);
-        }
+    return () => {
+      isMounted = false;
     };
+  }, [fetchOccupants]);
 
-    return (
-        <div className="min-h-screen bg-gray-900 text-gray-200 p-8">
-            <div className="max-w-6xl mx-auto space-y-8">
-                <div className="flex justify-between items-center border-b border-gray-700 pb-4">
-                    <h1 className="text-3xl font-semibold text-purple-300">Manajemen Penghuni</h1>
-                </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await createOccupant(formData);
+      alert('Warga berhasil ditambahkan!');
+      setFormData({ full_name: '', nik: '', phone: '', is_permanent: true });
+      setShowForm(false);
+      await fetchOccupants(); 
+    } catch (error) {
+      console.error("Gagal menambah warga:", error);
+      alert('Gagal menambah warga. Pastikan NIK belum terdaftar dan server menyala.');
+    }
+  };
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="col-span-1 bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 h-fit">
-                        <h2 className="text-xl font-medium mb-6 text-purple-400">Tambah Penghuni Baru</h2>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm mb-1 text-gray-400">Nama Lengkap</label>
-                                <input
-                                    type="text" name="full_name" required
-                                    value={formData.full_name} onChange={handleInputChange}
-                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:border-purple-500 transition-colors"
-                                />
-                            </div>
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1>Data Warga</h1>
+        <button onClick={() => setShowForm(!showForm)} style={btnStyle}>
+          {showForm ? 'Batal' : '+ Tambah Warga'}
+        </button>
+      </div>
 
-                            <div>
-                                <label className="block text-sm mb-1 text-gray-400">Nomor Telepon</label>
-                                <input
-                                    type="text" name="phone_number" required
-                                    value={formData.phone_number} onChange={handleInputChange}
-                                    className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:border-purple-500 transition-colors"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm mb-1 text-gray-400">Status Penghuni</label>
-                                    <select
-                                        name="occupant_status"
-                                        value={formData.occupant_status} onChange={handleInputChange}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:border-purple-500 transition-colors"
-                                    >
-                                        <option value="tetap">Tetap</option>
-                                        <option value="kontrak">Kontrak</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm mb-1 text-gray-400">Pernikahan</label>
-                                    <select
-                                        name="marital_status"
-                                        value={formData.marital_status} onChange={handleInputChange}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded-lg p-2.5 text-gray-200 focus:outline-none focus:border-purple-500 transition-colors"
-                                    >
-                                        <option value="belum_menikah">Belum</option>
-                                        <option value="menikah">Menikah</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm mb-1 text-gray-400">Foto KTP</label>
-                                <input
-                                    type="file" name="id_card_photo" accept="image/*"
-                                    onChange={handleInputChange}
-                                    className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-900 file:text-purple-300 hover:file:bg-purple-800 transition-colors cursor-pointer"
-                                />
-                            </div>
-
-                            <button
-                                type="submit" disabled={loading}
-                                className="w-full bg-purple-600 hover:bg-purple-500 text-white font-medium py-2.5 rounded-lg transition-colors mt-4 disabled:opacity-50"
-                            >
-                                {loading ? 'Menyimpan...' : 'Simpan Penghuni'}
-                            </button>
-                        </form>
-                    </div>
-
-                    <div className="col-span-2 bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 overflow-x-auto">
-                        <h2 className="text-xl font-medium mb-6 text-purple-400">Daftar Penghuni</h2>
-                        <table className="w-full text-left text-sm text-gray-400">
-                            <thead className="text-xs uppercase bg-gray-900 text-gray-300 border-b border-gray-700">
-                                <tr>
-                                    <th className="px-4 py-3 rounded-tl-lg">Nama</th>
-                                    <th className="px-4 py-3">Telepon</th>
-                                    <th className="px-4 py-3">Status</th>
-                                    <th className="px-4 py-3">Pernikahan</th>
-                                    <th className="px-4 py-3 rounded-tr-lg">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {occupants.length === 0 ? (
-                                    <tr>
-                                        <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
-                                            Belum ada data penghuni.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    occupants.map((occupant) => (
-                                        <tr key={occupant.id} className="border-b border-gray-700 hover:bg-gray-750 transition-colors">
-                                            <td className="px-4 py-3 font-medium text-gray-200">{occupant.full_name}</td>
-                                            <td className="px-4 py-3">{occupant.phone_number}</td>
-                                            <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 rounded text-xs font-medium ${occupant.occupant_status === 'tetap' ? 'bg-indigo-900 text-indigo-300' : 'bg-orange-900 text-orange-300'
-                                                    }`}>
-                                                    {occupant.occupant_status.toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 capitalize">{occupant.marital_status.replace('_', ' ')}</td>
-                                            <td className="px-4 py-3">
-                                                <button className="text-purple-400 hover:text-purple-300 text-xs font-medium">Edit</button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+      {showForm && (
+        <div style={formCardStyle}>
+          <form onSubmit={handleSubmit} style={gridStyle}>
+            <input 
+              placeholder="Nama Lengkap" 
+              value={formData.full_name} 
+              onChange={(e) => setFormData({...formData, full_name: e.target.value})} 
+              style={inputStyle} 
+              required 
+            />
+            <input 
+              placeholder="NIK (16 Digit)" 
+              value={formData.nik} 
+              onChange={(e) => setFormData({...formData, nik: e.target.value})} 
+              style={inputStyle} 
+              required 
+            />
+            <input 
+              placeholder="Nomor Telepon" 
+              value={formData.phone} 
+              onChange={(e) => setFormData({...formData, phone: e.target.value})} 
+              style={inputStyle} 
+              required 
+            />
+            <select 
+              value={formData.is_permanent} 
+              onChange={(e) => setFormData({...formData, is_permanent: e.target.value === 'true'})} 
+              style={inputStyle}
+            >
+              <option value="true">Warga Tetap</option>
+              <option value="false">Warga Kontrak</option>
+            </select>
+            <button type="submit" style={submitBtnStyle}>Simpan Warga</button>
+          </form>
         </div>
-    );
-}
+      )}
+
+      <div style={tableWrapStyle}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #333', color: '#a0a0a0', textAlign: 'left' }}>
+              <th style={thStyle}>Nama</th>
+              <th style={thStyle}>NIK</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Telepon</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center' }}>Memuat data...</td></tr>
+            ) : occupants.length > 0 ? (
+              occupants.map(person => (
+                <tr key={person.id} style={{ borderBottom: '1px solid #222' }}>
+                  <td style={tdStyle}>{person.full_name}</td>
+                  <td style={tdStyle}>{person.nik}</td>
+                  <td style={tdStyle}>{person.is_permanent ? 'Tetap' : 'Kontrak'}</td>
+                  <td style={tdStyle}>{person.phone}</td>
+                </tr>
+              ))
+            ) : (
+              <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center' }}>Belum ada data warga.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// Styling Object
+const btnStyle = { padding: '0.8rem 1.5rem', backgroundColor: '#b19cd9', color: '#121212', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', border: 'none' };
+const formCardStyle = { backgroundColor: '#1e1e1e', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #333' };
+const gridStyle = { display: 'grid', gap: '1rem', gridTemplateColumns: '1fr 1fr' };
+const inputStyle = { padding: '0.8rem', borderRadius: '8px', border: '1px solid #333', backgroundColor: '#121212', color: '#fff' };
+const submitBtnStyle = { gridColumn: 'span 2', padding: '1rem', backgroundColor: '#4ade80', color: '#121212', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', border: 'none' };
+const tableWrapStyle = { backgroundColor: '#1e1e1e', borderRadius: '12px', border: '1px solid #333', overflow: 'hidden' };
+const thStyle = { padding: '1rem' };
+const tdStyle = { padding: '1rem' };
+
+export default Occupants;

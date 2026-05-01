@@ -1,0 +1,43 @@
+.sidebar {
+  width: 260px;
+  background-color: var(--bg-card);
+  border-right: 1px solid var(--border-color);
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--accent-lavender);
+  margin-bottom: 2rem;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.navLink {
+  padding: 0.8rem 1rem;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: block;
+}
+
+.navLink:hover {
+  background-color: rgba(177, 156, 217, 0.1);
+  color: var(--accent-lavender);
+}
+
+/* Class ini akan aktif otomatis dari React Router */
+.activeLink {
+  background-color: var(--accent-lavender);
+  color: var(--bg-dark);
+}
+
+.activeLink:hover {
+  background-color: var(--accent-hover);
+  color: var(--bg-dark);
+}

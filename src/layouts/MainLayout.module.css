@@ -1,0 +1,11 @@
+.container {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+}
+
+.contentArea {
+  flex: 1;
+  padding: 2.5rem;
+  overflow-y: auto;
+}
